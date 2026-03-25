@@ -1,82 +1,348 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Newsvendor Game</title>
-  <style>
-    body { font-family: Arial; padding: 30px; }
-    input, button { font-size: 16px; padding: 8px; }
-    table { margin-top: 20px; border-collapse: collapse; }
-    td, th { padding: 8px 12px; border: 1px solid #ccc; }
-  </style>
-</head>
-<body>
+import React, { useMemo, useState } from "react";
 
-<h2>Newsvendor Game</h2>
+const COST = 10;
+const REVENUE = 25;
+const DEFAULT_MEAN = 200;
+const DEFAULT_SD = 50;
+const CRITICAL_FRACTILE = (REVENUE - COST) / REVENUE;
+const APPROX_Z_60 = 0.2533;
 
-<p>Cost = 10, Revenue = 25, Demand ~ Normal(200, 50)</p>
-
-<label>Order Quantity:</label>
-<input id="q" type="number" value="210">
-<button onclick="play()">Play Round</button>
-<button onclick="reset()">Reset</button>
-
-<h3 id="result"></h3>
-
-<table id="table">
-  <tr>
-    <th>Round</th>
-    <th>Order</th>
-    <th>Demand</th>
-    <th>Profit</th>
-  </tr>
-</table>
-
-<h3 id="avg"></h3>
-
-<script>
-let rounds = 0;
-let totalProfit = 0;
-
-function normal(mean, sd) {
-  let u = 0, v = 0;
+function sampleNormal(mean: number, sd: number) {
+  let u = 0;
+  let v = 0;
   while (u === 0) u = Math.random();
   while (v === 0) v = Math.random();
-  return Math.round(mean + sd * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v));
+  const z = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  return Math.max(0, Math.round(mean + sd * z));
 }
 
-function play() {
-  let q = parseInt(document.getElementById("q").value);
-  let d = Math.max(0, normal(200, 50));
-
-  let sales = Math.min(q, d);
-  let profit = 25 * sales - 10 * q;
-
-  rounds++;
-  totalProfit += profit;
-
-  document.getElementById("result").innerText =
-    "Demand: " + d + " | Profit: $" + profit;
-
-  let table = document.getElementById("table");
-  let row = table.insertRow(1);
-  row.insertCell(0).innerText = rounds;
-  row.insertCell(1).innerText = q;
-  row.insertCell(2).innerText = d;
-  row.insertCell(3).innerText = profit;
-
-  document.getElementById("avg").innerText =
-    "Average Profit: $" + Math.round(totalProfit / rounds);
+function currency(n: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(n);
 }
 
-function reset() {
-  rounds = 0;
-  totalProfit = 0;
-  document.getElementById("table").innerHTML =
-    "<tr><th>Round</th><th>Order</th><th>Demand</th><th>Profit</th></tr>";
-  document.getElementById("avg").innerText = "";
-  document.getElementById("result").innerText = "";
-}
-</script>
+type Round = {
+  round: number;
+  orderQty: number;
+  demand: number;
+  sales: number;
+  leftover: number;
+  profit: number;
+};
 
-</body>
-</html>
+function panelStyle(): React.CSSProperties {
+  return {
+    background: "white",
+    borderRadius: 16,
+    padding: 20,
+    boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+    border: "1px solid #e5e7eb",
+  };
+}
+
+function statStyle(): React.CSSProperties {
+  return {
+    background: "#f8fafc",
+    borderRadius: 12,
+    padding: 14,
+    border: "1px solid #e5e7eb",
+  };
+}
+
+function buttonStyle(primary = false): React.CSSProperties {
+  return {
+    height: 44,
+    padding: "0 18px",
+    borderRadius: 10,
+    border: primary ? "1px solid #111827" : "1px solid #d1d5db",
+    background: primary ? "#111827" : "white",
+    color: primary ? "white" : "#111827",
+    cursor: "pointer",
+    fontSize: 15,
+    fontWeight: 600,
+  };
+}
+
+function inputStyle(): React.CSSProperties {
+  return {
+    height: 42,
+    borderRadius: 10,
+    border: "1px solid #d1d5db",
+    padding: "0 12px",
+    fontSize: 15,
+    width: "100%",
+    boxSizing: "border-box",
+  };
+}
+
+export default function NewsvendorGameApp() {
+  const [mean, setMean] = useState<string>(String(DEFAULT_MEAN));
+  const [sd, setSd] = useState<string>(String(DEFAULT_SD));
+  const [guess, setGuess] = useState<string>("");
+  const [rounds, setRounds] = useState<Round[]>([]);
+  const [lastRound, setLastRound] = useState<Round | null>(null);
+
+  const parsedMean = Number(mean);
+  const parsedSd = Number(sd);
+  const parsedGuess = Number(guess);
+
+  const validMean = Number.isFinite(parsedMean) && parsedMean >= 0;
+  const validSd = Number.isFinite(parsedSd) && parsedSd >= 0;
+  const validGuess = Number.isFinite(parsedGuess) && parsedGuess >= 0 && validMean && validSd;
+
+  const theoreticalBestQ =
+    validMean && validSd ? Math.round(parsedMean + APPROX_Z_60 * parsedSd) : null;
+
+  const averageProfit = useMemo(() => {
+    if (rounds.length === 0) return 0;
+    return rounds.reduce((sum, r) => sum + r.profit, 0) / rounds.length;
+  }, [rounds]);
+
+  const averageDemand = useMemo(() => {
+    if (rounds.length === 0) return 0;
+    return rounds.reduce((sum, r) => sum + r.demand, 0) / rounds.length;
+  }, [rounds]);
+
+  const totalProfit = useMemo(() => {
+    return rounds.reduce((sum, r) => sum + r.profit, 0);
+  }, [rounds]);
+
+  const orderHint = useMemo(() => {
+    if (!validGuess) return "Enter a non-negative quantity.";
+    if (parsedGuess < parsedMean - 0.5 * parsedSd) return "Very conservative. You will often stock out.";
+    if (parsedGuess <= parsedMean + 0.6 * parsedSd) return "Reasonable range for this demand distribution.";
+    return "Aggressive. You may carry a lot of leftover inventory.";
+  }, [validGuess, parsedGuess, parsedMean, parsedSd]);
+
+  const playRound = () => {
+    if (!validGuess) return;
+    const orderQty = Math.round(parsedGuess);
+    const demand = sampleNormal(parsedMean, parsedSd);
+    const sales = Math.min(orderQty, demand);
+    const leftover = Math.max(orderQty - demand, 0);
+    const profit = REVENUE * sales - COST * orderQty;
+
+    const result: Round = {
+      round: rounds.length + 1,
+      orderQty,
+      demand,
+      sales,
+      leftover,
+      profit,
+    };
+
+    setRounds((prev) => [result, ...prev]);
+    setLastRound(result);
+  };
+
+  const resetGame = () => {
+    setRounds([]);
+    setLastRound(null);
+    setGuess("");
+  };
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#f8fafc",
+        padding: 24,
+        fontFamily: "Arial, sans-serif",
+        color: "#111827",
+      }}
+    >
+      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 20, alignItems: "start" }}>
+          <div style={panelStyle()}>
+            <h1 style={{ margin: "0 0 8px 0", fontSize: 30 }}>Newsvendor Game</h1>
+            <p style={{ margin: "0 0 20px 0", color: "#4b5563" }}>
+              Guess an order quantity, see realized demand, and compare average performance across repeated rounds.
+            </p>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+              <div style={statStyle()}>
+                <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 6 }}>Unit cost</div>
+                <div style={{ fontSize: 28, fontWeight: 700 }}>{currency(COST)}</div>
+              </div>
+              <div style={statStyle()}>
+                <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 6 }}>Unit revenue</div>
+                <div style={{ fontSize: 28, fontWeight: 700 }}>{currency(REVENUE)}</div>
+              </div>
+              <div style={statStyle()}>
+                <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 6 }}>Demand mean</div>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={mean}
+                  onChange={(e) => setMean(e.target.value)}
+                  style={inputStyle()}
+                />
+              </div>
+              <div style={statStyle()}>
+                <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 6 }}>Demand s.d.</div>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={sd}
+                  onChange={(e) => setSd(e.target.value)}
+                  style={inputStyle()}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 12, alignItems: "end", marginBottom: 20 }}>
+              <div>
+                <label style={{ display: "block", fontSize: 14, fontWeight: 600, marginBottom: 8 }}>
+                  Order quantity
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={guess}
+                  onChange={(e) => setGuess(e.target.value)}
+                  placeholder=""
+                  style={inputStyle()}
+                />
+                <div style={{ marginTop: 8, fontSize: 13, color: "#6b7280" }}>{orderHint}</div>
+              </div>
+              <button style={buttonStyle(true)} onClick={playRound} disabled={!validGuess}>
+                Play A Round
+              </button>
+              <button style={buttonStyle(false)} onClick={resetGame}>
+                Restart From Scratch
+              </button>
+            </div>
+
+            {lastRound && (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(5, 1fr)",
+                  gap: 12,
+                  background: "#111827",
+                  color: "white",
+                  borderRadius: 14,
+                  padding: 16,
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 11, textTransform: "uppercase", color: "#9ca3af" }}>Round</div>
+                  <div style={{ fontSize: 26, fontWeight: 700 }}>{lastRound.round}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, textTransform: "uppercase", color: "#9ca3af" }}>Demand</div>
+                  <div style={{ fontSize: 26, fontWeight: 700 }}>{lastRound.demand}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, textTransform: "uppercase", color: "#9ca3af" }}>Sales</div>
+                  <div style={{ fontSize: 26, fontWeight: 700 }}>{lastRound.sales}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, textTransform: "uppercase", color: "#9ca3af" }}>Leftover</div>
+                  <div style={{ fontSize: 26, fontWeight: 700 }}>{lastRound.leftover}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, textTransform: "uppercase", color: "#9ca3af" }}>Profit</div>
+                  <div style={{ fontSize: 26, fontWeight: 700 }}>{currency(lastRound.profit)}</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: "grid", gap: 20 }}>
+            <div style={panelStyle()}>
+              <h2 style={{ marginTop: 0, marginBottom: 14, fontSize: 20 }}>Performance</h2>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div style={statStyle()}>
+                  <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 6 }}>Rounds played</div>
+                  <div style={{ fontSize: 28, fontWeight: 700 }}>{rounds.length}</div>
+                </div>
+                <div style={statStyle()}>
+                  <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 6 }}>Average profit</div>
+                  <div style={{ fontSize: 28, fontWeight: 700 }}>{currency(averageProfit)}</div>
+                </div>
+                <div style={statStyle()}>
+                  <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 6 }}>Total profit</div>
+                  <div style={{ fontSize: 28, fontWeight: 700 }}>{currency(totalProfit)}</div>
+                </div>
+                <div style={statStyle()}>
+                  <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 6 }}>Average demand</div>
+                  <div style={{ fontSize: 28, fontWeight: 700 }}>{rounds.length ? averageDemand.toFixed(1) : "–"}</div>
+                </div>
+              </div>
+            </div>
+
+            <div style={panelStyle()}>
+              <h2 style={{ marginTop: 0, marginBottom: 14, fontSize: 20 }}>Teaching notes</h2>
+              <div style={{ display: "grid", gap: 12, fontSize: 14, color: "#4b5563" }}>
+                <div style={statStyle()}>
+                  With no salvage value, the critical fractile is <strong>{CRITICAL_FRACTILE.toFixed(2)}</strong>, so the theoretical benchmark is around <strong>Q* ≈ {theoreticalBestQ ?? "–"}</strong>.
+                </div>
+                <div style={statStyle()}>
+                  Because demand is random, a good policy will still have good and bad rounds. The point is to compare average performance over repeated plays.
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <span style={{ ...statStyle(), padding: "8px 10px" }}>Mean = {validMean ? parsedMean : "–"}</span>
+                  <span style={{ ...statStyle(), padding: "8px 10px" }}>SD = {validSd ? parsedSd : "–"}</span>
+                  <span style={{ ...statStyle(), padding: "8px 10px" }}>Cost = {COST}</span>
+                  <span style={{ ...statStyle(), padding: "8px 10px" }}>Revenue = {REVENUE}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ ...panelStyle(), marginTop: 20 }}>
+          <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 20 }}>Round history</h2>
+          <p style={{ marginTop: 0, color: "#6b7280" }}>Newest round first.</p>
+          {rounds.length === 0 ? (
+            <div
+              style={{
+                border: "1px dashed #d1d5db",
+                borderRadius: 14,
+                padding: 30,
+                textAlign: "center",
+                color: "#6b7280",
+              }}
+            >
+              No rounds yet. Enter an order quantity and play your first round.
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid #e5e7eb", textAlign: "left", color: "#6b7280" }}>
+                    <th style={{ padding: "10px 8px" }}>Round</th>
+                    <th style={{ padding: "10px 8px" }}>Order</th>
+                    <th style={{ padding: "10px 8px" }}>Demand</th>
+                    <th style={{ padding: "10px 8px" }}>Sales</th>
+                    <th style={{ padding: "10px 8px" }}>Leftover</th>
+                    <th style={{ padding: "10px 8px" }}>Profit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rounds.map((r) => (
+                    <tr key={r.round} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                      <td style={{ padding: "10px 8px" }}>{r.round}</td>
+                      <td style={{ padding: "10px 8px" }}>{r.orderQty}</td>
+                      <td style={{ padding: "10px 8px" }}>{r.demand}</td>
+                      <td style={{ padding: "10px 8px" }}>{r.sales}</td>
+                      <td style={{ padding: "10px 8px" }}>{r.leftover}</td>
+                      <td style={{ padding: "10px 8px", fontWeight: 700 }}>{currency(r.profit)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
