@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Newsvendor Game</title>
+  <title>Newsvendor Game - Monthly Play</title>
   <style>
     :root{
       --bg:#f8fafc;
@@ -22,7 +22,7 @@
       color: var(--text);
     }
     .wrap {
-      max-width: 1100px;
+      max-width: 1180px;
       margin: 0 auto;
       padding: 24px;
     }
@@ -102,7 +102,7 @@
       color: var(--muted);
       min-height: 18px;
     }
-    .last-round {
+    .last-month {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
       gap: 12px;
@@ -111,13 +111,13 @@
       border-radius: 14px;
       padding: 16px;
     }
-    .last-round .small {
+    .last-month .small {
       font-size: 11px;
       text-transform: uppercase;
       color: #9ca3af;
     }
-    .last-round .big {
-      font-size: 26px;
+    .last-month .big {
+      font-size: 24px;
       font-weight: 700;
       margin-top: 4px;
     }
@@ -147,11 +147,11 @@
       text-align: center;
       color: var(--muted);
     }
-    @media (max-width: 900px) {
+    @media (max-width: 980px) {
       .grid { grid-template-columns: 1fr; }
       .stats { grid-template-columns: 1fr 1fr; }
       .controls { grid-template-columns: 1fr; }
-      .last-round { grid-template-columns: 1fr 1fr; }
+      .last-month { grid-template-columns: 1fr 1fr; }
     }
   </style>
 </head>
@@ -160,45 +160,49 @@
     <div class="grid">
       <div class="panel">
         <h1 style="margin:0 0 8px 0; font-size:30px;">Newsvendor Game</h1>
-        <p style="margin:0 0 20px 0; color:#4b5563;">
-          Choose an order quantity, see realized demand, and compare average performance across repeated rounds.
+        <p style="margin:0 0 6px 0; color:#4b5563;">
+          Choose a quantity that would be delivered each day for the next month (30 days).
+          The inventory perishes at the end of each day.
+        </p>
+        <p style="margin:0 0 20px 0; color:#6b7280; font-size:14px;">
+          Everyone faces the same seeded sequence of daily demands.
         </p>
 
         <div class="stats">
           <div class="stat">
             <div class="label">Unit cost</div>
-            <div class="value">$5</div>
+            <div class="value" id="costDisplay">$5</div>
           </div>
           <div class="stat">
             <div class="label">Unit revenue</div>
-            <div class="value">$55</div>
+            <div class="value" id="revenueDisplay">$55</div>
           </div>
           <div class="stat">
-            <div class="label">Demand mean</div>
+            <div class="label">Daily mean demand</div>
             <div class="value" id="meanDisplay">400</div>
           </div>
           <div class="stat">
-            <div class="label">Demand s.d.</div>
+            <div class="label">Daily s.d.</div>
             <div class="value" id="sdDisplay">100</div>
           </div>
         </div>
 
         <div class="controls">
           <div>
-            <label for="orderInput" style="display:block; font-size:14px; font-weight:600; margin-bottom:8px;">Order quantity</label>
+            <label for="orderInput" style="display:block; font-size:14px; font-weight:600; margin-bottom:8px;">Daily delivery quantity</label>
             <input id="orderInput" type="number" min="0" step="1" value="">
-            <div class="hint" id="orderHint">Enter a non-negative quantity.</div>
+            <div class="hint" id="orderHint">Enter a non-negative daily quantity.</div>
           </div>
-          <button class="primary" id="playBtn">Play A Round</button>
+          <button class="primary" id="playBtn">Play One Month (30 Days)</button>
           <button id="resetBtn">Restart From Scratch</button>
         </div>
 
-        <div class="last-round" id="lastRoundPanel" style="display:none;">
-          <div><div class="small">Round</div><div class="big" id="lrRound"></div></div>
-          <div><div class="small">Demand</div><div class="big" id="lrDemand"></div></div>
-          <div><div class="small">Sales</div><div class="big" id="lrSales"></div></div>
-          <div><div class="small">Leftover</div><div class="big" id="lrLeftover"></div></div>
-          <div><div class="small">Profit</div><div class="big" id="lrProfit"></div></div>
+        <div class="last-month" id="lastMonthPanel" style="display:none;">
+          <div><div class="small">Month</div><div class="big" id="lmMonth"></div></div>
+          <div><div class="small">Month profit</div><div class="big" id="lmProfit"></div></div>
+          <div><div class="small">Avg daily demand</div><div class="big" id="lmAvgDemand"></div></div>
+          <div><div class="small">Avg daily sales</div><div class="big" id="lmAvgSales"></div></div>
+          <div><div class="small">Avg leftover</div><div class="big" id="lmAvgLeftover"></div></div>
         </div>
       </div>
 
@@ -206,35 +210,45 @@
         <h2 style="margin-top:0; margin-bottom:14px; font-size:20px;">Performance</h2>
         <div class="small-grid">
           <div class="stat">
-            <div class="label">Rounds played</div>
-            <div class="value" id="roundsPlayed">0</div>
+            <div class="label">Months played</div>
+            <div class="value" id="monthsPlayed">0</div>
           </div>
           <div class="stat">
-            <div class="label">Average profit</div>
-            <div class="value" id="avgProfit">$0</div>
+            <div class="label">Days played</div>
+            <div class="value" id="daysPlayed">0</div>
           </div>
           <div class="stat">
             <div class="label">Total profit</div>
             <div class="value" id="totalProfit">$0</div>
           </div>
           <div class="stat">
-            <div class="label">Average demand</div>
+            <div class="label">Average daily profit</div>
+            <div class="value" id="avgDailyProfit">$0</div>
+          </div>
+          <div class="stat">
+            <div class="label">Average daily demand</div>
             <div class="value" id="avgDemand">–</div>
+          </div>
+          <div class="stat">
+            <div class="label">Average daily leftover</div>
+            <div class="value" id="avgLeftover">–</div>
           </div>
         </div>
       </div>
     </div>
 
     <div class="panel" style="margin-top:20px;">
-      <h2 style="margin-top:0; margin-bottom:8px; font-size:20px;">Round history</h2>
-      <p style="margin-top:0; color:#6b7280;">Newest round first.</p>
-      <div id="emptyState" class="empty">No rounds yet. Enter an order quantity and play your first round.</div>
+      <h2 style="margin-top:0; margin-bottom:8px; font-size:20px;">Most recent month: daily performance</h2>
+      <p style="margin-top:0; color:#6b7280;">One click runs all 30 days. The table below shows the 30 daily outcomes from the latest month played.</p>
+      <div id="emptyState" class="empty">No month played yet. Enter a daily quantity and click “Play One Month (30 Days)”.</div>
       <div id="historyWrap" style="overflow-x:auto; display:none;">
         <table>
           <thead>
             <tr>
-              <th>Round</th>
-              <th>Order</th>
+              <th>Month</th>
+              <th>Day in Month</th>
+              <th>Global Day</th>
+              <th>Quantity</th>
               <th>Demand</th>
               <th>Sales</th>
               <th>Leftover</th>
@@ -248,22 +262,27 @@
   </div>
 
   <script>
-    const COST = 5;
-    const REVENUE = 55;
+    const UNIT_COST = 5;
+    const UNIT_REVENUE = 55;
 
-    // Instructor-set parameters. Change these before publishing.
+    // Instructor-set parameters. Change these before publishing if needed.
     const DEMAND_MEAN = 400;
     const DEMAND_SD = 100;
-    const SEED = 54321;
-    const MAX_ROUNDS = 500;
+    const SEED = 12345;
+    const DAYS_PER_MONTH = 30;
+    const MAX_DAYS = 5000;
 
-    const rounds = [];
+    const monthSummaries = [];
+    const allDays = [];
+    let latestMonthDays = [];
 
     const orderInput = document.getElementById('orderInput');
     const playBtn = document.getElementById('playBtn');
     const resetBtn = document.getElementById('resetBtn');
     const orderHint = document.getElementById('orderHint');
 
+    document.getElementById('costDisplay').textContent = currency(UNIT_COST);
+    document.getElementById('revenueDisplay').textContent = currency(UNIT_REVENUE);
     document.getElementById('meanDisplay').textContent = DEMAND_MEAN;
     document.getElementById('sdDisplay').textContent = DEMAND_SD;
 
@@ -285,7 +304,7 @@
 
     function updateHint() {
       if (!validOrder()) {
-        orderHint.textContent = 'Enter a non-negative quantity.';
+        orderHint.textContent = 'Enter a non-negative daily quantity.';
         playBtn.disabled = true;
         return;
       }
@@ -321,38 +340,41 @@
       return draws;
     }
 
-    const STANDARD_NORMAL_DRAWS = buildStandardNormalDraws(SEED, MAX_ROUNDS);
+    const STANDARD_NORMAL_DRAWS = buildStandardNormalDraws(SEED, MAX_DAYS);
 
-    function demandForRound(roundNumber) {
-      const index = (roundNumber - 1) % STANDARD_NORMAL_DRAWS.length;
+    function demandForGlobalDay(globalDay) {
+      const index = (globalDay - 1) % STANDARD_NORMAL_DRAWS.length;
       const z = STANDARD_NORMAL_DRAWS[index];
       return Math.max(0, Math.round(DEMAND_MEAN + DEMAND_SD * z));
     }
 
     function renderPerformance() {
-      const totalProfit = rounds.reduce((s, r) => s + r.profit, 0);
-      const avgProfit = rounds.length ? totalProfit / rounds.length : 0;
-      const avgDemand = rounds.length ? rounds.reduce((s, r) => s + r.demand, 0) / rounds.length : null;
+      const totalProfit = allDays.reduce((s, d) => s + d.profit, 0);
+      const avgDailyProfit = allDays.length ? totalProfit / allDays.length : 0;
+      const avgDemand = allDays.length ? allDays.reduce((s, d) => s + d.demand, 0) / allDays.length : null;
+      const avgLeftover = allDays.length ? allDays.reduce((s, d) => s + d.leftover, 0) / allDays.length : null;
 
-      document.getElementById('roundsPlayed').textContent = String(rounds.length);
-      document.getElementById('avgProfit').textContent = currency(avgProfit);
+      document.getElementById('monthsPlayed').textContent = String(monthSummaries.length);
+      document.getElementById('daysPlayed').textContent = String(allDays.length);
       document.getElementById('totalProfit').textContent = currency(totalProfit);
+      document.getElementById('avgDailyProfit').textContent = currency(avgDailyProfit);
       document.getElementById('avgDemand').textContent = avgDemand === null ? '–' : avgDemand.toFixed(1);
+      document.getElementById('avgLeftover').textContent = avgLeftover === null ? '–' : avgLeftover.toFixed(1);
     }
 
-    function renderLastRound() {
-      const panel = document.getElementById('lastRoundPanel');
-      if (!rounds.length) {
+    function renderLastMonth() {
+      const panel = document.getElementById('lastMonthPanel');
+      if (!monthSummaries.length) {
         panel.style.display = 'none';
         return;
       }
-      const r = rounds[0];
+      const m = monthSummaries[monthSummaries.length - 1];
       panel.style.display = 'grid';
-      document.getElementById('lrRound').textContent = r.round;
-      document.getElementById('lrDemand').textContent = r.demand;
-      document.getElementById('lrSales').textContent = r.sales;
-      document.getElementById('lrLeftover').textContent = r.leftover;
-      document.getElementById('lrProfit').textContent = currency(r.profit);
+      document.getElementById('lmMonth').textContent = m.month;
+      document.getElementById('lmProfit').textContent = currency(m.monthProfit);
+      document.getElementById('lmAvgDemand').textContent = m.avgDemand.toFixed(1);
+      document.getElementById('lmAvgSales').textContent = m.avgSales.toFixed(1);
+      document.getElementById('lmAvgLeftover').textContent = m.avgLeftover.toFixed(1);
     }
 
     function renderHistory() {
@@ -361,7 +383,7 @@
       const body = document.getElementById('historyBody');
       body.innerHTML = '';
 
-      if (!rounds.length) {
+      if (!latestMonthDays.length) {
         empty.style.display = 'block';
         wrap.style.display = 'none';
         return;
@@ -370,60 +392,88 @@
       empty.style.display = 'none';
       wrap.style.display = 'block';
 
-      rounds.forEach(r => {
+      latestMonthDays.forEach(d => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td>${r.round}</td>
-          <td>${r.orderQty}</td>
-          <td>${r.demand}</td>
-          <td>${r.sales}</td>
-          <td>${r.leftover}</td>
-          <td><strong>${currency(r.profit)}</strong></td>
+          <td>${d.month}</td>
+          <td>${d.dayInMonth}</td>
+          <td>${d.globalDay}</td>
+          <td>${d.orderQty}</td>
+          <td>${d.demand}</td>
+          <td>${d.sales}</td>
+          <td>${d.leftover}</td>
+          <td><strong>${currency(d.profit)}</strong></td>
         `;
         body.appendChild(tr);
       });
     }
 
-    function playRound() {
+    function playMonth() {
       if (!validOrder()) return;
 
-      const roundNumber = rounds.length + 1;
+      const monthNumber = monthSummaries.length + 1;
       const orderQty = Math.round(getOrder());
-      const demand = demandForRound(roundNumber);
-      const sales = Math.min(orderQty, demand);
-      const leftover = Math.max(orderQty - demand, 0);
-      const profit = REVENUE * sales - COST * orderQty;
+      latestMonthDays = [];
 
-      rounds.unshift({
-        round: roundNumber,
+      for (let dayInMonth = 1; dayInMonth <= DAYS_PER_MONTH; dayInMonth++) {
+        const globalDay = allDays.length + 1;
+        const demand = demandForGlobalDay(globalDay);
+        const sales = Math.min(orderQty, demand);
+        const leftover = Math.max(orderQty - demand, 0);
+        const profit = UNIT_REVENUE * sales - UNIT_COST * orderQty;
+
+        const result = {
+          month: monthNumber,
+          dayInMonth,
+          globalDay,
+          orderQty,
+          demand,
+          sales,
+          leftover,
+          profit
+        };
+
+        latestMonthDays.push(result);
+        allDays.push(result);
+      }
+
+      const monthProfit = latestMonthDays.reduce((s, d) => s + d.profit, 0);
+      const avgDemand = latestMonthDays.reduce((s, d) => s + d.demand, 0) / DAYS_PER_MONTH;
+      const avgSales = latestMonthDays.reduce((s, d) => s + d.sales, 0) / DAYS_PER_MONTH;
+      const avgLeftover = latestMonthDays.reduce((s, d) => s + d.leftover, 0) / DAYS_PER_MONTH;
+
+      monthSummaries.push({
+        month: monthNumber,
         orderQty,
-        demand,
-        sales,
-        leftover,
-        profit
+        monthProfit,
+        avgDemand,
+        avgSales,
+        avgLeftover
       });
 
       renderPerformance();
-      renderLastRound();
+      renderLastMonth();
       renderHistory();
     }
 
     function resetGame() {
-      rounds.length = 0;
+      monthSummaries.length = 0;
+      allDays.length = 0;
+      latestMonthDays = [];
       orderInput.value = '';
       renderPerformance();
-      renderLastRound();
+      renderLastMonth();
       renderHistory();
       updateHint();
     }
 
     orderInput.addEventListener('input', updateHint);
-    playBtn.addEventListener('click', playRound);
+    playBtn.addEventListener('click', playMonth);
     resetBtn.addEventListener('click', resetGame);
 
     updateHint();
     renderPerformance();
-    renderLastRound();
+    renderLastMonth();
     renderHistory();
   </script>
 </body>
