@@ -100,6 +100,7 @@
       margin-top: 8px;
       font-size: 13px;
       color: var(--muted);
+      min-height: 18px;
     }
     .last-round {
       display: grid;
@@ -119,10 +120,6 @@
       font-size: 26px;
       font-weight: 700;
       margin-top: 4px;
-    }
-    .side-grid {
-      display: grid;
-      gap: 20px;
     }
     .small-grid {
       display: grid;
@@ -150,16 +147,6 @@
       text-align: center;
       color: var(--muted);
     }
-    .note {
-      color: var(--muted);
-      font-size: 14px;
-      line-height: 1.4;
-    }
-    code {
-      background: #f3f4f6;
-      padding: 2px 6px;
-      border-radius: 6px;
-    }
     @media (max-width: 900px) {
       .grid { grid-template-columns: 1fr; }
       .stats { grid-template-columns: 1fr 1fr; }
@@ -174,25 +161,25 @@
       <div class="panel">
         <h1 style="margin:0 0 8px 0; font-size:30px;">Newsvendor Game</h1>
         <p style="margin:0 0 20px 0; color:#4b5563;">
-          Choose an order quantity, see realized demand, and compare average performance across repeated rounds.
+          Guess an order quantity, see realized demand, and compare average performance across repeated rounds.
         </p>
 
         <div class="stats">
           <div class="stat">
             <div class="label">Unit cost</div>
-            <div class="value" id="costDisplay">$5</div>
+            <div class="value">$10</div>
           </div>
           <div class="stat">
             <div class="label">Unit revenue</div>
-            <div class="value" id="revenueDisplay">$55</div>
+            <div class="value">$25</div>
           </div>
           <div class="stat">
             <div class="label">Demand mean</div>
-            <div class="value" id="meanDisplay">400</div>
+            <div class="value" id="meanDisplay">200</div>
           </div>
           <div class="stat">
             <div class="label">Demand s.d.</div>
-            <div class="value" id="sdDisplay">100</div>
+            <div class="value" id="sdDisplay">50</div>
           </div>
         </div>
 
@@ -215,38 +202,24 @@
         </div>
       </div>
 
-      <div class="side-grid">
-        <div class="panel">
-          <h2 style="margin-top:0; margin-bottom:14px; font-size:20px;">Performance</h2>
-          <div class="small-grid">
-            <div class="stat">
-              <div class="label">Rounds played</div>
-              <div class="value" id="roundsPlayed">0</div>
-            </div>
-            <div class="stat">
-              <div class="label">Average profit</div>
-              <div class="value" id="avgProfit">$0</div>
-            </div>
-            <div class="stat">
-              <div class="label">Total profit</div>
-              <div class="value" id="totalProfit">$0</div>
-            </div>
-            <div class="stat">
-              <div class="label">Average demand</div>
-              <div class="value" id="avgDemand">–</div>
-            </div>
+      <div class="panel">
+        <h2 style="margin-top:0; margin-bottom:14px; font-size:20px;">Performance</h2>
+        <div class="small-grid">
+          <div class="stat">
+            <div class="label">Rounds played</div>
+            <div class="value" id="roundsPlayed">0</div>
           </div>
-        </div>
-
-        <div class="panel">
-          <h2 style="margin-top:0; margin-bottom:14px; font-size:20px;">Instructor setup</h2>
-          <div class="note">
-            To change the demand settings before publishing, edit the two values near the top of the script:
-            <br><br>
-            <code>const DEMAND_MEAN = 400;</code><br>
-            <code>const DEMAND_SD = 100;</code>
-            <br><br>
-            These are displayed to players but cannot be changed from the page itself.
+          <div class="stat">
+            <div class="label">Average profit</div>
+            <div class="value" id="avgProfit">$0</div>
+          </div>
+          <div class="stat">
+            <div class="label">Total profit</div>
+            <div class="value" id="totalProfit">$0</div>
+          </div>
+          <div class="stat">
+            <div class="label">Average demand</div>
+            <div class="value" id="avgDemand">–</div>
           </div>
         </div>
       </div>
@@ -275,12 +248,14 @@
   </div>
 
   <script>
-    const COST = 5;
-    const REVENUE = 55;
+    const COST = 10;
+    const REVENUE = 25;
 
-    // Change these two values before publishing if you want different demand parameters.
-    const DEMAND_MEAN = 400;
-    const DEMAND_SD = 100;
+    // Instructor-set parameters. Change these before publishing.
+    const DEMAND_MEAN = 200;
+    const DEMAND_SD = 50;
+    const SEED = 12345;
+    const MAX_ROUNDS = 500;
 
     const rounds = [];
 
@@ -291,14 +266,6 @@
 
     document.getElementById('meanDisplay').textContent = DEMAND_MEAN;
     document.getElementById('sdDisplay').textContent = DEMAND_SD;
-
-    function sampleNormal(mean, sd) {
-      let u = 0, v = 0;
-      while (u === 0) u = Math.random();
-      while (v === 0) v = Math.random();
-      const z = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
-      return Math.max(0, Math.round(mean + sd * z));
-    }
 
     function currency(n) {
       return new Intl.NumberFormat('en-US', {
@@ -316,15 +283,51 @@
       return Number.isFinite(getOrder()) && getOrder() >= 0 && orderInput.value !== '';
     }
 
-function updateHint() {
-  if (!validOrder()) {
-    orderHint.textContent = 'Enter a non-negative quantity.';
-    playBtn.disabled = true;
-    return;
-  }
-  orderHint.textContent = '';
-  playBtn.disabled = false;
-}
+    function updateHint() {
+      if (!validOrder()) {
+        orderHint.textContent = 'Enter a non-negative quantity.';
+        playBtn.disabled = true;
+        return;
+      }
+      orderHint.textContent = '';
+      playBtn.disabled = false;
+    }
+
+    function mulberry32(seed) {
+      let t = seed >>> 0;
+      return function() {
+        t += 0x6D2B79F5;
+        let r = Math.imul(t ^ (t >>> 15), 1 | t);
+        r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+        return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function buildStandardNormalDraws(seed, count) {
+      const rng = mulberry32(seed);
+      const draws = [];
+      while (draws.length < count) {
+        let u1 = 0;
+        let u2 = 0;
+        while (u1 === 0) u1 = rng();
+        while (u2 === 0) u2 = rng();
+        const radius = Math.sqrt(-2 * Math.log(u1));
+        const theta = 2 * Math.PI * u2;
+        draws.push(radius * Math.cos(theta));
+        if (draws.length < count) {
+          draws.push(radius * Math.sin(theta));
+        }
+      }
+      return draws;
+    }
+
+    const STANDARD_NORMAL_DRAWS = buildStandardNormalDraws(SEED, MAX_ROUNDS);
+
+    function demandForRound(roundNumber) {
+      const index = (roundNumber - 1) % STANDARD_NORMAL_DRAWS.length;
+      const z = STANDARD_NORMAL_DRAWS[index];
+      return Math.max(0, Math.round(DEMAND_MEAN + DEMAND_SD * z));
+    }
 
     function renderPerformance() {
       const totalProfit = rounds.reduce((s, r) => s + r.profit, 0);
@@ -384,14 +387,15 @@ function updateHint() {
     function playRound() {
       if (!validOrder()) return;
 
+      const roundNumber = rounds.length + 1;
       const orderQty = Math.round(getOrder());
-      const demand = sampleNormal(DEMAND_MEAN, DEMAND_SD);
+      const demand = demandForRound(roundNumber);
       const sales = Math.min(orderQty, demand);
       const leftover = Math.max(orderQty - demand, 0);
       const profit = REVENUE * sales - COST * orderQty;
 
       rounds.unshift({
-        round: rounds.length + 1,
+        round: roundNumber,
         orderQty,
         demand,
         sales,
