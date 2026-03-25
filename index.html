@@ -316,22 +316,15 @@
       return Number.isFinite(getOrder()) && getOrder() >= 0 && orderInput.value !== '';
     }
 
-    function updateHint() {
-      if (!validOrder()) {
-        orderHint.textContent = 'Enter a non-negative quantity.';
-        playBtn.disabled = true;
-        return;
-      }
-      const q = getOrder();
-      if (q < DEMAND_MEAN - 0.5 * DEMAND_SD) {
-        orderHint.textContent = 'Very conservative. You will often stock out.';
-      } else if (q <= DEMAND_MEAN + 0.6 * DEMAND_SD) {
-        orderHint.textContent = 'Reasonable range for this demand distribution.';
-      } else {
-        orderHint.textContent = 'Aggressive. You may carry a lot of leftover inventory.';
-      }
-      playBtn.disabled = false;
-    }
+function updateHint() {
+  if (!validOrder()) {
+    orderHint.textContent = 'Enter a non-negative quantity.';
+    playBtn.disabled = true;
+    return;
+  }
+  orderHint.textContent = '';
+  playBtn.disabled = false;
+}
 
     function renderPerformance() {
       const totalProfit = rounds.reduce((s, r) => s + r.profit, 0);
