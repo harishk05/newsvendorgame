@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Newsvendor Game</title>
+  <style>
+    body { font-family: Arial; padding: 30px; }
+    input, button { font-size: 16px; padding: 8px; }
+    table { margin-top: 20px; border-collapse: collapse; }
+    td, th { padding: 8px 12px; border: 1px solid #ccc; }
+  </style>
+</head>
+<body>
+
+<h2>Newsvendor Game</h2>
+
+<p>Cost = 10, Revenue = 25, Demand ~ Normal(200, 50)</p>
+
+<label>Order Quantity:</label>
+<input id="q" type="number" value="210">
+<button onclick="play()">Play Round</button>
+<button onclick="reset()">Reset</button>
+
+<h3 id="result"></h3>
+
+<table id="table">
+  <tr>
+    <th>Round</th>
+    <th>Order</th>
+    <th>Demand</th>
+    <th>Profit</th>
+  </tr>
+</table>
+
+<h3 id="avg"></h3>
+
+<script>
+let rounds = 0;
+let totalProfit = 0;
+
+function normal(mean, sd) {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.round(mean + sd * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v));
+}
+
+function play() {
+  let q = parseInt(document.getElementById("q").value);
+  let d = Math.max(0, normal(200, 50));
+
+  let sales = Math.min(q, d);
+  let profit = 25 * sales - 10 * q;
+
+  rounds++;
+  totalProfit += profit;
+
+  document.getElementById("result").innerText =
+    "Demand: " + d + " | Profit: $" + profit;
+
+  let table = document.getElementById("table");
+  let row = table.insertRow(1);
+  row.insertCell(0).innerText = rounds;
+  row.insertCell(1).innerText = q;
+  row.insertCell(2).innerText = d;
+  row.insertCell(3).innerText = profit;
+
+  document.getElementById("avg").innerText =
+    "Average Profit: $" + Math.round(totalProfit / rounds);
+}
+
+function reset() {
+  rounds = 0;
+  totalProfit = 0;
+  document.getElementById("table").innerHTML =
+    "<tr><th>Round</th><th>Order</th><th>Demand</th><th>Profit</th></tr>";
+  document.getElementById("avg").innerText = "";
+  document.getElementById("result").innerText = "";
+}
+</script>
+
+</body>
+</html>
