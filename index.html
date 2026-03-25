@@ -129,18 +129,6 @@
       grid-template-columns: 1fr 1fr;
       gap: 12px;
     }
-    .tag-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-    .tag {
-      background: var(--light);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 8px 10px;
-      font-size: 14px;
-    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -161,6 +149,16 @@
       padding: 30px;
       text-align: center;
       color: var(--muted);
+    }
+    .note {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    code {
+      background: #f3f4f6;
+      padding: 2px 6px;
+      border-radius: 6px;
     }
     @media (max-width: 900px) {
       .grid { grid-template-columns: 1fr; }
@@ -190,11 +188,11 @@
           </div>
           <div class="stat">
             <div class="label">Demand mean</div>
-            <input id="meanInput" type="number" min="0" step="1" value="200">
+            <div class="value" id="meanDisplay">200</div>
           </div>
           <div class="stat">
             <div class="label">Demand s.d.</div>
-            <input id="sdInput" type="number" min="0" step="1" value="50">
+            <div class="value" id="sdDisplay">50</div>
           </div>
         </div>
 
@@ -241,20 +239,14 @@
         </div>
 
         <div class="panel">
-          <h2 style="margin-top:0; margin-bottom:14px; font-size:20px;">Teaching notes</h2>
-          <div style="display:grid; gap:12px; font-size:14px; color:#4b5563;">
-            <div class="stat">
-              With no salvage value, the critical fractile is <strong id="criticalFractile"></strong>, so the theoretical benchmark is around <strong id="qStarDisplay"></strong>.
-            </div>
-            <div class="stat">
-              Because demand is random, a good policy will still have good and bad rounds. The point is to compare average performance over repeated plays.
-            </div>
-            <div class="tag-row">
-              <span class="tag" id="meanTag"></span>
-              <span class="tag" id="sdTag"></span>
-              <span class="tag">Cost = 10</span>
-              <span class="tag">Revenue = 25</span>
-            </div>
+          <h2 style="margin-top:0; margin-bottom:14px; font-size:20px;">Instructor setup</h2>
+          <div class="note">
+            To change the demand settings before publishing, edit the two values near the top of the script:
+            <br><br>
+            <code>const DEMAND_MEAN = 200;</code><br>
+            <code>const DEMAND_SD = 50;</code>
+            <br><br>
+            These are displayed to players but cannot be changed from the page itself.
           </div>
         </div>
       </div>
@@ -285,16 +277,20 @@
   <script>
     const COST = 10;
     const REVENUE = 25;
-    const APPROX_Z_60 = 0.2533;
-    const CRITICAL_FRACTILE = (REVENUE - COST) / REVENUE;
+
+    // Change these two values before publishing if you want different demand parameters.
+    const DEMAND_MEAN = 200;
+    const DEMAND_SD = 50;
+
     const rounds = [];
 
-    const meanInput = document.getElementById('meanInput');
-    const sdInput = document.getElementById('sdInput');
     const orderInput = document.getElementById('orderInput');
     const playBtn = document.getElementById('playBtn');
     const resetBtn = document.getElementById('resetBtn');
     const orderHint = document.getElementById('orderHint');
+
+    document.getElementById('meanDisplay').textContent = DEMAND_MEAN;
+    document.getElementById('sdDisplay').textContent = DEMAND_SD;
 
     function sampleNormal(mean, sd) {
       let u = 0, v = 0;
@@ -312,32 +308,12 @@
       }).format(n);
     }
 
-    function getMean() {
-      return Number(meanInput.value);
-    }
-
-    function getSd() {
-      return Number(sdInput.value);
-    }
-
     function getOrder() {
       return Number(orderInput.value);
     }
 
-    function validParams() {
-      return Number.isFinite(getMean()) && getMean() >= 0 && Number.isFinite(getSd()) && getSd() >= 0;
-    }
-
     function validOrder() {
-      return Number.isFinite(getOrder()) && getOrder() >= 0 && validParams() && orderInput.value !== '';
-    }
-
-    function updateTeachingNotes() {
-      document.getElementById('criticalFractile').textContent = CRITICAL_FRACTILE.toFixed(2);
-      const qStar = validParams() ? Math.round(getMean() + APPROX_Z_60 * getSd()) : '–';
-      document.getElementById('qStarDisplay').textContent = `Q* ≈ ${qStar}`;
-      document.getElementById('meanTag').textContent = `Mean = ${validParams() ? getMean() : '–'}`;
-      document.getElementById('sdTag').textContent = `SD = ${validParams() ? getSd() : '–'}`;
+      return Number.isFinite(getOrder()) && getOrder() >= 0 && orderInput.value !== '';
     }
 
     function updateHint() {
@@ -347,11 +323,9 @@
         return;
       }
       const q = getOrder();
-      const mean = getMean();
-      const sd = getSd();
-      if (q < mean - 0.5 * sd) {
+      if (q < DEMAND_MEAN - 0.5 * DEMAND_SD) {
         orderHint.textContent = 'Very conservative. You will often stock out.';
-      } else if (q <= mean + 0.6 * sd) {
+      } else if (q <= DEMAND_MEAN + 0.6 * DEMAND_SD) {
         orderHint.textContent = 'Reasonable range for this demand distribution.';
       } else {
         orderHint.textContent = 'Aggressive. You may carry a lot of leftover inventory.';
@@ -418,7 +392,7 @@
       if (!validOrder()) return;
 
       const orderQty = Math.round(getOrder());
-      const demand = sampleNormal(getMean(), getSd());
+      const demand = sampleNormal(DEMAND_MEAN, DEMAND_SD);
       const sales = Math.min(orderQty, demand);
       const leftover = Math.max(orderQty - demand, 0);
       const profit = REVENUE * sales - COST * orderQty;
@@ -446,19 +420,10 @@
       updateHint();
     }
 
-    meanInput.addEventListener('input', () => {
-      updateTeachingNotes();
-      updateHint();
-    });
-    sdInput.addEventListener('input', () => {
-      updateTeachingNotes();
-      updateHint();
-    });
     orderInput.addEventListener('input', updateHint);
     playBtn.addEventListener('click', playRound);
     resetBtn.addEventListener('click', resetGame);
 
-    updateTeachingNotes();
     updateHint();
     renderPerformance();
     renderLastRound();
